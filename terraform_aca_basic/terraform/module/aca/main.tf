@@ -81,3 +81,25 @@ resource "azurerm_container_app_environment" "aca_env" {
 
   tags = var.tags
 }
+
+# ストレージアカウントの名前の末尾に付与する8桁のランダムなIDを作成する
+resource "random_id" "aca_storage_suffix" {
+  byte_length = 8
+}
+
+# ストレージアカウント「aca_storage」を作成する
+resource "azurerm_storage_account" "aca_storage" {
+  name                          = "sa${var.region_code}${random_id.aca_storage_suffix.dec}"
+  resource_group_name           = data.azurerm_resource_group.rg.name
+  location                      = data.azurerm_resource_group.rg.location
+  account_tier                  = "Standard"
+  
+  # 変更点: すべての環境でZRSを有効化
+  account_replication_type      = "ZRS"
+  
+  public_network_access_enabled = false
+  network_rules {
+    default_action = "Deny"
+  }
+  tags = var.tags
+}
