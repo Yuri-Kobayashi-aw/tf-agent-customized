@@ -37,3 +37,47 @@ data "azurerm_resource_group" "rg" {
 data "azurerm_resource_group" "rg_vnet" {
   name = var.vnet_resource_group_name
 }
+
+# 仮想ネットワーク「aca_vnet」を参照する
+# 備考：ACA環境の仮想ネットワーク
+data "azurerm_virtual_network" "aca_vnet" {
+  name                = var.virtual_network_name
+  resource_group_name = data.azurerm_resource_group.rg_vnet.name
+}
+
+# サブネット「aca_subnet」を参照する
+# 備考：ACA 用のサブネット
+data "azurerm_subnet" "aca_subnet" {
+  name                 = var.aca_subnet_name
+  virtual_network_name = data.azurerm_virtual_network.aca_vnet.name
+  resource_group_name  = data.azurerm_resource_group.rg_vnet.name
+}
+
+# Log Analytics ワークスペース「la_ws」を参照する
+data "azurerm_log_analytics_workspace" "la_ws" {
+  name                = "${local.la_name}-${var.la_ws_suffix}"
+  resource_group_name = data.azurerm_resource_group.rg.name
+}
+
+# Azure Container Apps 環境「aca_env」を作成する
+resource "azurerm_container_app_environment" "aca_env" {
+  name                           = local.aca_name
+  resource_group_name            = data.azurerm_resource_group.rg.name
+  location                       = data.azurerm_resource_group.rg.location
+  log_analytics_workspace_id     = data.azurerm_log_analytics_workspace.la_ws.id
+  internal_load_balancer_enabled = true
+  
+  # 変更点: すべての環境でゾーン冗長性を有効化し、地理的冗長性要件に対応
+  zone_redundancy_enabled        = true
+  
+  infrastructure_subnet_id       = data.azurerm_subnet.aca_subnet.id
+
+  workload_profile {
+    name                  = "default"
+    workload_profile_type = var.workload_profile_type
+    maximum_count         = var.maximum_count
+    minimum_count         = var.minimum_count
+  }
+
+  tags = var.tags
+}
